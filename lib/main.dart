@@ -43,6 +43,18 @@ class _CalculatorState extends State<Calculator> {
           _display = 'Error';
           _expression = '';
         }
+      } else if (value == 'x²') {
+        try {
+          final exp = Expression.parse(_expression);
+          final evaluator = ExpressionEvaluator();
+          final result = evaluator.eval(exp, {});
+          final squared = double.parse(result.toString()) * double.parse(result.toString());
+          _display = '($_expression)² = $squared';
+          _expression = squared.toString();
+        } catch (e) {
+          _display = 'Error';
+          _expression = '';
+        }
       } else {
         _expression += value;
         _display = _expression;
@@ -79,7 +91,8 @@ class _CalculatorState extends State<Calculator> {
           Row(children: [_button('7'), _button('8'), _button('9'), _button('/')]),
           Row(children: [_button('4'), _button('5'), _button('6'), _button('*')]),
           Row(children: [_button('1'), _button('2'), _button('3'), _button('-')]),
-          Row(children: [_button('0'), _button('C'), _button('='), _button('+')]),
+          Row(children: [_button('0'), _button('x²'), _button('='), _button('+')]),
+          Row(children: [_button('C')]), // optional: separate clear button row
         ],
       ),
     );
