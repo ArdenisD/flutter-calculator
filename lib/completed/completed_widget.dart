@@ -139,7 +139,7 @@ class _CompletedWidgetState extends State<CompletedWidget> {
                     ),
                     Padding(
                       padding:
-                          EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 24.0, 0.0),
+                          EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 23.0, 0.0),
                       child: Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(24.0),
