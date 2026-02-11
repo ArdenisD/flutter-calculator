@@ -1,98 +1,190 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:expressions/expressions.dart';
 
-void main() {
-  runApp(const MyApp());
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'auth/firebase_auth/firebase_user_provider.dart';
+import 'auth/firebase_auth/auth_util.dart';
+
+import 'backend/firebase/firebase_config.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
+import 'flutter_flow/flutter_flow_util.dart';
+import 'index.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  GoRouter.optionURLReflectsImperativeAPIs = true;
+  usePathUrlStrategy();
+
+  await initFirebase();
+
+  await FlutterFlowTheme.initialize();
+
+  runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends StatefulWidget {
+  // This widget is the root of your application.
+  @override
+  State<MyApp> createState() => _MyAppState();
+
+  static _MyAppState of(BuildContext context) =>
+      context.findAncestorStateOfType<_MyAppState>()!;
+}
+
+class MyAppScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+      };
+}
+
+class _MyAppState extends State<MyApp> {
+  ThemeMode _themeMode = FlutterFlowTheme.themeMode;
+
+  late AppStateNotifier _appStateNotifier;
+  late GoRouter _router;
+  String getRoute([RouteMatch? routeMatch]) {
+    final RouteMatch lastMatch =
+        routeMatch ?? _router.routerDelegate.currentConfiguration.last;
+    final RouteMatchList matchList = lastMatch is ImperativeRouteMatch
+        ? lastMatch.matches
+        : _router.routerDelegate.currentConfiguration;
+    return matchList.uri.toString();
+  }
+
+  List<String> getRouteStack() =>
+      _router.routerDelegate.currentConfiguration.matches
+          .map((e) => getRoute(e))
+          .toList();
+  late Stream<BaseAuthUser> userStream;
+
+  final authUserSub = authenticatedUserStream.listen((_) {});
+
+  @override
+  void initState() {
+    super.initState();
+
+    _appStateNotifier = AppStateNotifier.instance;
+    _router = createRouter(_appStateNotifier);
+    userStream = todoFirebaseUserStream()
+      ..listen((user) {
+        _appStateNotifier.update(user);
+      });
+    jwtTokenStream.listen((_) {});
+    Future.delayed(
+      Duration(milliseconds: 1000),
+      () => _appStateNotifier.stopShowingSplashImage(),
+    );
+  }
+
+  @override
+  void dispose() {
+    authUserSub.cancel();
+
+    super.dispose();
+  }
+
+  void setThemeMode(ThemeMode mode) => safeSetState(() {
+        _themeMode = mode;
+        FlutterFlowTheme.saveThemeMode(mode);
+      });
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Calculator(),
-    );
-  }
-}
-
-class Calculator extends StatefulWidget {
-  const Calculator({super.key});
-
-  @override
-  State<Calculator> createState() => _CalculatorState();
-}
-
-class _CalculatorState extends State<Calculator> {
-  String _expression = '';
-  String _display = '';
-
-  void _press(String value) {
-    setState(() {
-      if (value == 'C') {
-        _expression = '';
-        _display = '';
-      } else if (value == '=') {
-        try {
-          final exp = Expression.parse(_expression);
-          final evaluator = ExpressionEvaluator();
-          final result = evaluator.eval(exp, {});
-          _display = '$_expression = $result';
-          _expression = result.toString();
-        } catch (e) {
-          _display = 'Error';
-          _expression = '';
-        }
-      } else if (value == 'x²') {
-        try {
-          final exp = Expression.parse(_expression);
-          final evaluator = ExpressionEvaluator();
-          final result = evaluator.eval(exp, {});
-          final squared = double.parse(result.toString()) * double.parse(result.toString());
-          _display = '($_expression)² = $squared';
-          _expression = squared.toString();
-        } catch (e) {
-          _display = 'Error';
-          _expression = '';
-        }
-      } else {
-        _expression += value;
-        _display = _expression;
-      }
-    });
-  }
-
-  Widget _button(String text) {
-    return Expanded(
-      child: ElevatedButton(
-        onPressed: () => _press(text),
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 20),
-        ),
+    return MaterialApp.router(
+      debugShowCheckedModeBanner: false,
+      title: 'Todo',
+      scrollBehavior: MyAppScrollBehavior(),
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('en', '')],
+      theme: ThemeData(
+        brightness: Brightness.light,
+        useMaterial3: false,
       ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        useMaterial3: false,
+      ),
+      themeMode: _themeMode,
+      routerConfig: _router,
     );
+  }
+}
+
+class NavBarPage extends StatefulWidget {
+  NavBarPage({
+    Key? key,
+    this.initialPage,
+    this.page,
+    this.disableResizeToAvoidBottomInset = false,
+  }) : super(key: key);
+
+  final String? initialPage;
+  final Widget? page;
+  final bool disableResizeToAvoidBottomInset;
+
+  @override
+  _NavBarPageState createState() => _NavBarPageState();
+}
+
+/// This is the private State class that goes with NavBarPage.
+class _NavBarPageState extends State<NavBarPage> {
+  String _currentPageName = 'tasks';
+  late Widget? _currentPage;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPageName = widget.initialPage ?? _currentPageName;
+    _currentPage = widget.page;
   }
 
   @override
   Widget build(BuildContext context) {
+    final tabs = {
+      'tasks': TasksWidget(),
+      'completed': CompletedWidget(),
+    };
+    final currentIndex = tabs.keys.toList().indexOf(_currentPageName);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Ardenis Calculator')),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            alignment: Alignment.centerRight,
-            child: Text(
-              _display,
-              style: const TextStyle(fontSize: 24),
+      resizeToAvoidBottomInset: !widget.disableResizeToAvoidBottomInset,
+      body: _currentPage ?? tabs[_currentPageName],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: currentIndex,
+        onTap: (i) => safeSetState(() {
+          _currentPage = null;
+          _currentPageName = tabs.keys.toList()[i];
+        }),
+        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+        selectedItemColor: FlutterFlowTheme.of(context).primary,
+        unselectedItemColor: FlutterFlowTheme.of(context).secondaryText,
+        showSelectedLabels: false,
+        showUnselectedLabels: false,
+        type: BottomNavigationBarType.fixed,
+        items: <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(
+              Icons.format_list_bulleted,
+              size: 30.0,
             ),
+            label: 'Home',
+            tooltip: '',
           ),
-          Row(children: [_button('7'), _button('8'), _button('9'), _button('/')]),
-          Row(children: [_button('4'), _button('5'), _button('6'), _button('*')]),
-          Row(children: [_button('1'), _button('2'), _button('3'), _button('-')]),
-          Row(children: [_button('0'), _button('x²'), _button('='), _button('+')]),
-          Row(children: [_button('C')]), // optional: separate clear button row
+          BottomNavigationBarItem(
+            icon: Icon(
+              Icons.checklist_sharp,
+              size: 30.0,
+            ),
+            label: 'Home',
+            tooltip: '',
+          )
         ],
       ),
     );
